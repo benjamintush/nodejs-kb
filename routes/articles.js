@@ -1,20 +1,22 @@
 const express = require('express');
 const router = express.Router();
 
-// Bring in article Models
+// Article Models
 let Article = require('../models/article');
+// User Model
+const User = require('../models/user');
 
  // Add route
- router.get('/add', function (req, res) {
+ router.get('/add', ensureAuthenticated, function (req, res) {
    res.render('add_article', {
      title: 'Add Articles'
    });
  });
 
  // Add article submit route
- router.post('/add', function (req, res) {
+ router.post('/add', ensureAuthenticated, function (req, res) {
    req.checkBody('title', 'Title is required').notEmpty();
-   req.checkBody('author', 'Author is required').notEmpty();
+   // req.checkBody('author', 'Author is required').notEmpty();
    req.checkBody('body', 'Body is required').notEmpty();
 
    //Get the error if any
@@ -27,7 +29,7 @@ let Article = require('../models/article');
    }else{
      let article = new Article;
      article.title = req.body.title;
-     article.author = req.body.author;
+     article.author = req.user._id;
      article.body = req.body.body;
 
      article.save(function (err) {
@@ -45,15 +47,32 @@ let Article = require('../models/article');
  // Get single article
  router.get('/:id', (req, res) => {
    Article.findById(req.params.id, (err, article) => {
-     res.render('article', {
-       article: article
-     });
+     User.findById(article.author, (err, user) => {
+       res.render('article', {
+         article: article,
+         author: user.name
+       });
+     })
    });
  });
 
+ // Access Control
+  function ensureAuthenticated(req, res, next) {
+    if(req.isAuthenticated()){
+      return next();
+    } else {
+      req.flash('danger', 'Please login');
+      res.redirect('/users/login')
+    }
+
+  }
  // Load Article Edit form
- router.get('/edit/:id', (req, res) => {
+ router.get('/edit/:id', ensureAuthenticated, (req, res) => {
    Article.findById(req.params.id, (err, article) => {
+     if (article.author != req.user._id){
+       req.flash('danger', 'Not Authorized');
+       res.redirect('/');
+     }
      res.render('edit_article', {
        title: 'Edit Article',
        article: article
@@ -62,7 +81,7 @@ let Article = require('../models/article');
  });
 
  // Update article
- router.post('/edit/:id', function (req, res) {
+ router.post('/edit/:id', ensureAuthenticated, function (req, res) {
    let article = {};
    article.title = req.body.title;
    article.author = req.body.author;
@@ -83,13 +102,22 @@ let Article = require('../models/article');
 
  // Delete article
  router.delete('/:id', (req, res) => {
+   if (!req.user._id){
+     res.status(500).send();
+   }
    let query = {_id: req.params.id};
-   Article.remove(query, (err) => {
-     if(err){
-       console.log(err)
+   article.findById(req.params.id, function (err, article) {
+     if(article.author != req.user._id){
+       res.status(500).send();
+     }else{
+       Article.remove(query, (err) => {
+         if(err){
+           console.log(err)
+         }
+         res.send('Success');
+       });
      }
-     res.send('Success');
-   });
+   })
  });
 
  module.exports = router;

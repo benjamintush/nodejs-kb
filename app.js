@@ -3,10 +3,11 @@ const path = require('path');
 const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
 const expressValidator = require('express-validator');
-const flash = require('connect-flash');
 const session = require('express-session');
+const passport = require('passport');
+const dbConfig = require('./config/database');
 
-mongoose.connect('mongodb://localhost/nodekb');
+mongoose.connect(dbConfig.database);
 let db = mongoose.connection;
 // Check db connection
 db.once('open', function () {
@@ -42,11 +43,6 @@ app.use(session({
   resave: false,
   saveUninitialized: true
 }));
-// app.use(session({
-//   secret: 'keyboard cat',
-//   resave: true,
-//   saveUninitialized: true,
-// }));
 
 // Express Messages Middleware
 app.use(require('connect-flash')());
@@ -54,11 +50,6 @@ app.use(function (req, res, next) {
   res.locals.messages = require('express-messages')(req, res);
   next();
 });
-// app.use(flash());
-// app.use(function (req, res, next) {
-//   res.locals.messages = require('express-messages')(req, res);
-//   next();
-// });
 
 // Express Validator
 app.use(expressValidator({
@@ -70,6 +61,17 @@ app.use(expressValidator({
     return { param: formParam, msg: msg, value: value};
 }
 }));
+
+// Passport config
+require('./config/passport')(passport);
+// Passport Middleware
+app.use(passport.initialize());
+app.use(passport.session());
+
+app.get('*', (req, res, next)=>{
+  res.locals.user = req.user || null;
+  next();
+});
 
 // Home route
 app.get('/', function (req, res) {
