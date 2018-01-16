@@ -1,0 +1,4 @@
+.messages.pt-3
+  each type in Object.keys(messages)
+    each message in messages[type]
+      .alert(class='alert-' + type, role='alert') #{message}
